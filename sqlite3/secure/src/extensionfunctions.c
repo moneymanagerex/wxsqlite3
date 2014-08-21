@@ -72,6 +72,7 @@ the HAVE_TRIM #define.
 Liam Healy
 
 History:
+2014-08-21 cleanup according the latest math.h 
 2010-01-06 Correct check for argc in squareFunc, and add Windows
 compilation instructions.
 2009-06-24 Correct check for argc in properFunc.
@@ -109,16 +110,7 @@ Original code 2006 June 05 by relicoder.
 //#include "config.h"
 
 //#define COMPILE_SQLITE_EXTENSIONS_AS_LOADABLE_MODULE 1
-//#define HAVE_ACOSH 1
-//#define HAVE_ASINH 1
-//#define HAVE_ATANH 1
-#define HAVE_SINH 1
-#define HAVE_COSH 1
-#define HAVE_TANH 1
-#define HAVE_LOG10 1
-//#define HAVE_ISBLANK 1
 #define SQLITE_SOUNDEX 1
-#define HAVE_TRIM 1		/* LMH 2007-03-25 if sqlite has trim functions */
 
 #ifdef COMPILE_SQLITE_EXTENSIONS_AS_LOADABLE_MODULE
 #include "sqlite3ext.h"
@@ -207,10 +199,6 @@ int int_cmp(const void *a, const void *b);
 int double_cmp(const void *a, const void *b);
 
 #endif /* _MAP_H_ */
-
-typedef uint8_t         u8;
-//typedef uint16_t        u16;
-typedef int64_t         i64;
 
 static char *sqlite3StrDup( const char *z ) {
     char *res = sqlite3_malloc( strlen(z)+1 );
@@ -398,28 +386,8 @@ GEN_MATH_WRAP_DOUBLE_1(atanFunc, atan)
 ** written proof here)
 */
 
-#ifndef HAVE_ACOSH
-static double acosh(double x){
-  return log(x + sqrt(x*x - 1.0));
-}
-#endif
-
 GEN_MATH_WRAP_DOUBLE_1(acoshFunc, acosh)
-
-#ifndef HAVE_ASINH
-static double asinh(double x){
-  return log(x + sqrt(x*x + 1.0));
-}
-#endif
-
 GEN_MATH_WRAP_DOUBLE_1(asinhFunc, asinh)
-
-#ifndef HAVE_ATANH
-static double atanh(double x){
-  return (1.0/2.0)*log((1+x)/(1-x)) ;
-}
-#endif
-
 GEN_MATH_WRAP_DOUBLE_1(atanhFunc, atanh)
 
 /*
@@ -437,50 +405,11 @@ GEN_MATH_WRAP_DOUBLE_1(cotFunc, cot)
 static double coth(double x){
   return 1.0/tanh(x);
 }
-
-/*
-** Many systems don't have hyperbolic trigonometric functions so this will emulate
-** them on those systems directly from the definition in terms of exp
-*/
-#ifndef HAVE_SINH
-static double sinh(double x){
-  return (exp(x)-exp(-x))/2.0;
-}
-#endif
-
-GEN_MATH_WRAP_DOUBLE_1(sinhFunc, sinh)
-
-#ifndef HAVE_COSH
-static double cosh(double x){
-  return (exp(x)+exp(-x))/2.0;
-}
-#endif
-
-GEN_MATH_WRAP_DOUBLE_1(coshFunc, cosh)
-
-#ifndef HAVE_TANH
-static double tanh(double x){
-  return sinh(x)/cosh(x);
-}
-#endif
-
-GEN_MATH_WRAP_DOUBLE_1(tanhFunc, tanh)
-
 GEN_MATH_WRAP_DOUBLE_1(cothFunc, coth)
 
-/*
-** Some systems lack log in base 10. This will emulate it
-*/
-
-#ifndef HAVE_LOG10
-static double log10(double x){
-  static double l10 = -1.0;
-  if( l10<0.0 ){
-    l10 = log(10.0);
-  }
-  return log(x)/l10;
-}
-#endif
+GEN_MATH_WRAP_DOUBLE_1(sinhFunc, sinh)
+GEN_MATH_WRAP_DOUBLE_1(coshFunc, cosh)
+GEN_MATH_WRAP_DOUBLE_1(tanhFunc, tanh)
 
 GEN_MATH_WRAP_DOUBLE_1(logFunc, log)
 GEN_MATH_WRAP_DOUBLE_1(log10Func, log10)
@@ -716,16 +645,6 @@ static void replicateFunc(sqlite3_context *context, int argc, sqlite3_value **ar
     sqlite3_free(zo);
   }
 }
-
-/* 
-** Some systems (win32 among others) don't have an isblank function, this will emulate it.
-** This function is not UFT-8 safe since it only analyses a byte character.
-*/
-#ifndef HAVE_ISBLANK
-int isblank(char c){
-  return( ' '==c || '\t'==c );
-}
-#endif
 
 static void properFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
   const unsigned char *z;     /* input string */
@@ -1160,167 +1079,6 @@ static void rightFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
   sqlite3_free(rz);
 }
 
-#ifndef HAVE_TRIM
-/*
-** removes the whitespaces at the begining of a string.
-*/
-const char* ltrim(const char* s){
-  while( *s==' ' )
-    ++s;
-  return s;
-}
-
-/*
-** removes the whitespaces at the end of a string.
-** !mutates the input string!
-*/
-void rtrim(char* s){
-  char* ss = s+strlen(s)-1;
-  while( ss>=s && *ss==' ' )
-    --ss;
-  *(ss+1)='\0';
-}
-
-/*
-**  Removes the whitespace at the begining of a string
-*/
-static void ltrimFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
-  const char *z;
-
-  assert( argc==1);
-
-  if( SQLITE_NULL==sqlite3_value_type(argv[0]) ){
-    sqlite3_result_null(context);
-    return;
-  }
-  z = sqlite3_value_text(argv[0]);
-  sqlite3_result_text(context, ltrim(z), -1, SQLITE_TRANSIENT); 
-}
-
-/*
-**  Removes the whitespace at the end of a string
-*/
-static void rtrimFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
-  const char *z;
-  char *rz;
-  /* try not to change data in argv */
-
-  assert( argc==1);
-
-  if( SQLITE_NULL==sqlite3_value_type(argv[0]) ){
-    sqlite3_result_null(context);
-    return;
-  }
-  z = sqlite3_value_text(argv[0]);
-  rz = sqlite3StrDup(z);
-  rtrim(rz);
-  sqlite3_result_text(context, rz, -1, SQLITE_TRANSIENT);
-  sqlite3_free(rz);
-}
-
-/*
-**  Removes the whitespace at the begining and end of a string
-*/
-static void trimFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
-  const char *z;
-  char *rz;
-  /* try not to change data in argv */
-
-  assert( argc==1);
-
-  if( SQLITE_NULL==sqlite3_value_type(argv[0]) ){
-    sqlite3_result_null(context);
-    return;
-  }
-  z = sqlite3_value_text(argv[0]);
-  rz = sqlite3StrDup(z);
-  rtrim(rz);
-  sqlite3_result_text(context, ltrim(rz), -1, SQLITE_TRANSIENT);
-  sqlite3_free(rz);
-}
-#endif
-
-/*
-** given a pointer to a string s1, the length of that string (l1), a new string (s2)
-** and it's length (l2) appends s2 to s1.
-** All lengths in bytes.
-** This is just an auxiliary function
-*/
-// static void _append(char **s1, int l1, const char *s2, int l2){
-//   *s1 = realloc(*s1, (l1+l2+1)*sizeof(char));
-//   strncpy((*s1)+l1, s2, l2);
-//   *(*(s1)+l1+l2) = '\0';
-// }
-
-#ifndef HAVE_TRIM
-
-/*
-** given strings s, s1 and s2 replaces occurrences of s1 in s by s2
-*/
-static void replaceFunc(sqlite3_context *context, int argc, sqlite3_value **argv){
-  const char *z1;     /* string s (first parameter) */
-  const char *z2;     /* string s1 (second parameter) string to look for */
-  const char *z3;     /* string s2 (third parameter) string to replace occurrences of s1 with */
-  int lz1;
-  int lz2;
-  int lz3;
-  int lzo=0;
-  char *zo=0;
-  int ret=0;
-  const char *zt1;
-  const char *zt2;
-
-  assert( 3==argc );
-
-  if( SQLITE_NULL==sqlite3_value_type(argv[0]) ){
-    sqlite3_result_null(context);
-    return;
-  }
-
-  z1 = sqlite3_value_text(argv[0]);
-  z2 = sqlite3_value_text(argv[1]);
-  z3 = sqlite3_value_text(argv[2]);
-  /* handle possible null values */
-  if( 0==z2 ){
-    z2="";
-  }
-  if( 0==z3 ){
-    z3="";
-  }
-
-  lz1 = strlen(z1);
-  lz2 = strlen(z2);
-  lz3 = strlen(z3);
-
-#if 0
-  /* special case when z2 is empty (or null) nothing will be changed */
-  if( 0==lz2 ){
-    sqlite3_result_text(context, z1, -1, SQLITE_TRANSIENT);
-    return;
-  }
-#endif
-
-  zt1=z1;
-  zt2=z1;
-
-  while(1){
-    ret=_substr(z2,zt1 , 0, &zt2);
-
-    if( ret<0 )
-      break;
-
-    _append(&zo, lzo, zt1, zt2-zt1);
-    lzo+=zt2-zt1;
-    _append(&zo, lzo, z3, lz3);
-    lzo+=lz3;
-
-    zt1=zt2+lz2;
-  }
-  _append(&zo, lzo, zt1, lz1-(zt1-z1));
-  sqlite3_result_text(context, zo, -1, SQLITE_TRANSIENT);
-  sqlite3_free(zo);
-}
-#endif
 
 /*
 ** given a string returns the same string but with the characters in reverse order
@@ -1779,12 +1537,6 @@ int RegisterExtensionFunctions(sqlite3 *db){
     { "charindex",          3, 0, SQLITE_UTF8,    0, charindexFunc },
     { "leftstr",            2, 0, SQLITE_UTF8,    0, leftFunc },
     { "rightstr",           2, 0, SQLITE_UTF8,    0, rightFunc },
-#ifndef HAVE_TRIM
-    { "ltrim",              1, 0, SQLITE_UTF8,    0, ltrimFunc },
-    { "rtrim",              1, 0, SQLITE_UTF8,    0, rtrimFunc },
-    { "trim",               1, 0, SQLITE_UTF8,    0, trimFunc },
-    { "replace",            3, 0, SQLITE_UTF8,    0, replaceFunc },
-#endif
     { "reverse",            1, 0, SQLITE_UTF8,    0, reverseFunc },
     { "proper",             1, 0, SQLITE_UTF8,    0, properFunc },
     { "padl",               2, 0, SQLITE_UTF8,    0, padlFunc },
