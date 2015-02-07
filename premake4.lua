@@ -153,21 +153,29 @@ project "minimal"
     defines { "WIN32", "_WINDOWS" }
     files { "samples/*.rc" }
 
+  configuration "linux"
+	defines { "dl", "pthread" }
+
   configuration "embed"
     links { "wxsqlite3lib" }
 
-    links { "sqlite3", "dl", "pthread" }
+    links { "sqlite3" }
     libdirs { "sqlite3/secure/aes128/lib/release" }
 
   configuration "not embed"
     -- FIXME: premake4-beta gmake fails to using correct links options for dll
     -- links { "wxsqlite3dll" }
-    defines { "WXUSINGDLL_WXSQLITE3" }
     links { "wxsqlite3" }
-    libdirs { "bin/dll/release" }
+	defines { "WXUSINGDLL_WXSQLITE3" }
 
     links { "sqlite3" }
     libdirs { "sqlite3/secure/aes128/dll/release" }
+	
+  configuration { "not embed", "Debug" }
+	libdirs { "bin/dll/debug" }
+
+  configuration { "not embed", "Release" }
+	libdirs { "bin/dll/release" }
 
   configuration "Debug"
     targetdir "bin/debug"
