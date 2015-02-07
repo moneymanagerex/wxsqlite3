@@ -1,5 +1,23 @@
 dofile "premake/wxwidgets.lua"
 
+newoption {
+  trigger = "wx_version",
+  value   = "VERSION",
+  description = "Choose wxWidgets version",
+  allowed = {
+    { "2.8", "wxWidgets 2.8 (default)" },
+    { "2.9", "wxWidgets 2.9" },
+    { "3.0", "wxWidgets 3.0" }
+  }
+}
+
+newoption {
+  trigger = "embed",
+  description = "embed SQLite3 statically"
+}
+
+wx_version = _OPTIONS["wx_version"] or "2.8"
+
 solution "wxsqlite3"
   configurations { "Debug", "Release" }
 
@@ -14,16 +32,12 @@ project "wxsqlite3lib"
   }
   files { "src/*.cpp", "include/wx/*.h" }
   includedirs { "include", "sqlite3/include" }
-  flags { "Unicode" }  
-  links { "sqlite3" }
-  libdirs { "sqlite3/secure/aes128/dll/release" }
+  flags { "Unicode" }
 
   location "build/wxsqlite3lib"
   targetname "wxsqlite3"
 
   defines {
-    "WIN32",
-    "_WINDOWS",
     "_LIB",
     "WXMAKINGLIB_WXSQLITE3",
     "wxUSE_DYNAMIC_SQLITE3_LOAD=0",
@@ -35,22 +49,25 @@ project "wxsqlite3lib"
     "_CRT_NONSTDC_NO_DEPRECATE"
   }
 
+  configuration "windows"
+    defines { "WIN32", "_WINDOWS" }
+
   configuration "Debug"
     targetdir "bin/lib/debug"
     defines {
-      "DEBUG", 
+      "DEBUG",
       "_DEBUG"
     }
     flags { "Symbols" }
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="yes"}
- 
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="yes"}
+
   configuration "Release"
     targetdir "bin/lib/release"
-    defines { 
-      "NDEBUG" 
+    defines {
+      "NDEBUG"
     }
-    flags { "Optimize" }  
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="no"}
+    flags { "Optimize" }
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="no"}
 
 -- wxSQLite3 as shared library
 project "wxsqlite3dll"
@@ -63,16 +80,13 @@ project "wxsqlite3dll"
   }
   files { "src/*.cpp", "include/wx/*.h" }
   includedirs { "include", "sqlite3/include" }
-  flags { "Unicode" }  
-  links { "sqlite3" }
-  libdirs { "sqlite3/secure/aes128/dll/release" }
+  flags { "Unicode" }
+
 
   location "build/wxsqlite3dll"
   targetname "wxsqlite3"
 
   defines {
-    "WIN32",
-    "_WINDOWS",
     "_USRDLL",
     "WXMAKINGDLL_WXSQLITE3",
     "wxUSE_DYNAMIC_SQLITE3_LOAD=0",
@@ -84,22 +98,35 @@ project "wxsqlite3dll"
     "_CRT_NONSTDC_NO_DEPRECATE"
   }
 
+  -- seems not used
+  configuration "embed"
+    links { "sqlite3" }
+    libdirs { "sqlite3/secure/aes128/lib/release" }
+
+  configuration "not embed"
+    links { "sqlite3" }
+    libdirs { "sqlite3/secure/aes128/dll/release" }
+  --
+
+  configuration "windows"
+    defines { "WIN32", "_WINDOWS" }
+
   configuration "Debug"
     targetdir "bin/dll/debug"
     defines {
-      "DEBUG", 
+      "DEBUG",
       "_DEBUG"
     }
     flags { "Symbols" }
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="yes"}
- 
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="yes"}
+
   configuration "Release"
     targetdir "bin/dll/release"
-    defines { 
-      "NDEBUG" 
+    defines {
+      "NDEBUG"
     }
-    flags { "Optimize" }  
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="no"}
+    flags { "Optimize" }
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="no"}
 
 -- Minimal wxSQLite3 sample
 project "minimal"
@@ -110,30 +137,54 @@ project "minimal"
     ["Header Files"] = { "**.h" },
     ["Source Files"] = { "**.cpp", "**.rc" }
   }
-  files { "samples/*.cpp", "samples/*.rc" }
+  files { "samples/*.cpp" }
   includedirs { "include" }
-  flags { "Unicode" }  
-  links { "wxsqlite3dll" }
+  flags { "Unicode" }
 
   location "build/minimal"
 
   defines {
-    "WIN32",
-    "_WINDOWS",
-    "WXUSINGDLL_WXSQLITE3",
     "_CRT_SECURE_NO_WARNINGS",
     "_CRT_SECURE_NO_DEPRECATE",
     "_CRT_NONSTDC_NO_DEPRECATE"
   }
 
+  configuration "windows"
+    defines { "WIN32", "_WINDOWS" }
+    files { "samples/*.rc" }
+
+  configuration "linux"
+	defines { "dl", "pthread" }
+
+  configuration "embed"
+    links { "wxsqlite3lib" }
+
+    links { "sqlite3" }
+    libdirs { "sqlite3/secure/aes128/lib/release" }
+
+  configuration "not embed"
+    -- FIXME: premake4-beta gmake fails to using correct links options for dll
+    -- links { "wxsqlite3dll" }
+    links { "wxsqlite3" }
+	defines { "WXUSINGDLL_WXSQLITE3" }
+
+    links { "sqlite3" }
+    libdirs { "sqlite3/secure/aes128/dll/release" }
+	
+  configuration { "not embed", "Debug" }
+	libdirs { "bin/dll/debug" }
+
+  configuration { "not embed", "Release" }
+	libdirs { "bin/dll/release" }
+
   configuration "Debug"
-    targetdir "bin/dll/debug"
+    targetdir "bin/debug"
     defines { "DEBUG" }
     flags { "Symbols" }
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="yes"}
- 
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="yes"}
+
   configuration "Release"
-    targetdir "bin/dll/release"
+    targetdir "bin/release"
     defines { "NDEBUG" }
-    flags { "Optimize" }  
-    wx_config {Unicode="yes", Version="2.8", Static="no", Debug="no"}
+    flags { "Optimize" }
+    wx_config {Unicode="yes", Version=wx_version, Static="no", Debug="no"}
